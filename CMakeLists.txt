@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
 
-add_executable(game 
+add_executable(app
     src/main.cpp 
     src/glad.c 
     src/Shader.cpp 
@@ -16,8 +16,8 @@ add_executable(game
 	src/stb.cpp
 )
 
-target_include_directories(game PRIVATE headers include)
+target_include_directories(app PRIVATE headers include)
 
-target_link_libraries(game PRIVATE OpenGL::GL glfw dl)
+target_link_libraries(app PRIVATE OpenGL::GL glfw)
 
 file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
