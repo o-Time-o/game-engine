@@ -14,6 +14,7 @@ add_executable(app
     src/VBO.cpp 
     src/EBO.cpp
 	src/stb.cpp
+    src/Texture.cpp
 )
 
 target_include_directories(app PRIVATE headers include)
