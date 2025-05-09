@@ -1,13 +1,6 @@
-lib/
 build/
-rebuild.sh
-rebuild.bat
-glfw3.dll
-CMakeFiles/
-*.vcxproj
-*.filters
-*.cmake
-*.sln
-include/
-CMakeCache.txt
 CMakeLists.txt
+compile_flags.txt
+rebuild.sh
+.gitignore
+.clang-format
