@@ -1,87 +1,75 @@
 #include "Game.hpp"
-// #include "Main/Systems.hpp"
-// #include "Main/Entities.hpp"
-// #include "Main/EntityComponents.hpp"
-// #include "Graphics/ResourceManager.hpp"
-//
-// #include "imgui/imgui.h"
+#include <imgui.h>
+#include "Entities.hpp"
+#include "EntityComponents.hpp"
+#include "Systems.hpp"
+#include "PixelOperations.hpp"
+#include "Constants.hpp"
 
-// SpriteRenderer *Renderer;
-// Manager manager;
+bool showColliders = false;
 
-Game::Game(unsigned int width, unsigned int height) : state(GAME_ACTIVE), keys(), width(width), height(height)
+Game::Game(unsigned int width, unsigned int height) : state(GAME_ACTIVE), width(width), height(height)
 {
 }
 
 Game::~Game()
 {
-	// delete Renderer;
+	b2DestroyWorld(world);
+	registry.clear();
 }
 
 void Game::Init()
 {
-	// ResourceManager::LoadShader("resources/shaders/default.vert", "resources/shaders/default.frag", nullptr, "default");
-	// glm::mat4 projection = ResourceManager::SetProjection(static_cast<float>(this->width), static_cast<float>(this->height));
-	//
-	//    ResourceManager::GetShader("default").Use().SetInteger("texture0", 0);
-	//    ResourceManager::GetShader("default").SetMatrix4("projection", projection);
-	//
-	// Shader shader = ResourceManager::GetShader("default");
-	//    Renderer = new SpriteRenderer(shader);
-	//
-	//    ResourceManager::LoadTexture("resources/textures/image.jpg", false, "tired");
-	// ResourceManager::LoadTexture("resources/textures/image2.jpg", false, "tired2");
-	//
-	// Components::RegisterAll(manager);
-	// Entities::CreatePlayer(manager);
+	b2WorldDef worldDef = b2DefaultWorldDef();
+	worldDef.gravity = {0.f, 0.f};
+	world = b2CreateWorld(&worldDef);
+
+	CreateGrounds(world, width, height);
+
+	std::vector<Pixel> block = ConvertImageToPixels("resources/textures/box.png");
+	auto player = CreateRigidBody(registry, world, std::move(block), {800.f, 200.f});
+	registry.emplace<Velocity>(player, sf::Vector2f{200.f, 200.f});
+	registry.emplace<PlayerTag>(player);
 }
 
-void Game::Update(float dt)
+void Game::Update(float dt, sf::RenderWindow &window)
 {
-	// if(state == GAME_ACTIVE)
-	// {
-	// 	bool moveKeys[4] = {
-	// 		keys[GLFW_KEY_A],
-	// 		keys[GLFW_KEY_D],
-	// 		keys[GLFW_KEY_W],
-	// 		keys[GLFW_KEY_S]
-	// 	};
-	//
-	// 	PlayerMovementSystem(manager, moveKeys, dt);
-	// }
+	if(this->state == GAME_ACTIVE)
+	{
+		b2World_Step(world, 1/60.f, 8);
+
+		if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
+		{
+			sf::Vector2f mouse = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+			System::DestructionSystem(registry, world, PixelsToMeters(mouse), 10.f / SCALE);
+		}
+
+		System::Movement(registry, input);
+	}
 }
 
 void Game::ProcessInput(float dt)
 {
-	// if(state == GAME_ACTIVE)
-	// {
-	// 	// if(mouse[GLFW_MOUSE_BUTTON_RIGHT])
-	// 	// {
-	// 	// 	DeleteAllSystem(manager);
-	// 	// }
-	//
-	// 	if(mouse[GLFW_MOUSE_BUTTON_LEFT])
-	// 	{
-	// 		Entities::CreateEnemy(manager, glm::vec3(cursor, 0.0f));
-	// 	}
-	// }
+	if(this->state == GAME_ACTIVE)
+	{
+		input.left  = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
+		input.right = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
+		input.up  = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W);
+		input.down  = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
+	}
 }
 
-void Game::Render()
+void Game::Render(sf::RenderWindow &window)
 {
-	// Renderer->Begin();
-	//
-	// RenderSystem(manager, Renderer);
-	//
-	// Renderer->End();
-	// Renderer->Flush();
+	System::RenderRigidBody(registry, window, showColliders);
 }
 
 void Game::RenderUI(float dt, double fps)
 {
-	// ImGui::Begin("STATS");
-	// ImGui::Text("Delta Time: %.4f", dt);
-	// ImGui::Text("FPS: %.1f", fps);
-	// ImGui::Text("Objects: %zu/%zu", manager.GetAliveEntityCount(), static_cast<size_t>(MAX_ENTITIES));
-	// ImGui::End();
+	ImGui::Begin("Debug");
+	ImGui::Text("Delta Time: %.4f", dt);
+	ImGui::Text("FPS: %.1f", fps);
+	ImGui::Checkbox("Show Colliders", &showColliders);
+	ImGui::Text("New Game");
+	ImGui::End();
 }

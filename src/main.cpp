@@ -1,71 +1,35 @@
-#include "SFML/Window/Keyboard.hpp"
 #include <SFML/Graphics.hpp>
-#include <entt/entt.hpp>
-#include <box2d/box2d.h>
-#include <imgui.h>
 #include <imgui-SFML.h>
+#include <imgui.h>
 #include <iostream>
+#include "Game.hpp"
 
-static constexpr float SCALE = 30.f;
-static constexpr float MOVE_FORCE = 10.f;
-static constexpr float JUMP_IMPULSE = 5.f;
+const unsigned int WIDTH_SIZE = 1920;
+const unsigned int HEIGHT_SIZE = 1080;
+const float TARGET_ASPECT_RATIO = static_cast<float>(WIDTH_SIZE) / HEIGHT_SIZE;
 
-struct Transform {
-    sf::RectangleShape shape;
-};
+void UpdateAspectRatio(sf::RenderWindow& window, sf::View& view);
 
-struct RigidBody {
-    b2BodyId body;
-};
+Game game(WIDTH_SIZE, HEIGHT_SIZE);
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode({800, 600}), "Game");
-	
+    sf::RenderWindow window(sf::VideoMode({WIDTH_SIZE, HEIGHT_SIZE}), "Game", sf::Style::Default, sf::State::Fullscreen);
+	window.setFramerateLimit(60);
+
+	sf::View view(sf::FloatRect({0.f, 0.f}, {WIDTH_SIZE, HEIGHT_SIZE}));
+    window.setView(view);
+
 	if(!ImGui::SFML::Init(window)) {
 		std::cerr << "Failed to initialize ImGui-SFML\n";
 		return 1;
 	}
-	window.setFramerateLimit(60);
-
-	b2WorldDef worldDef = b2DefaultWorldDef();
-    worldDef.gravity = {0.f, 9.8f};
-    b2WorldId world = b2CreateWorld(&worldDef);
-
-	entt::registry registry;
-
-    auto entity = registry.create();
-
-	sf::RectangleShape square(sf::Vector2f(50.f, 50.f));
-    square.setFillColor(sf::Color::Green);
-    square.setOrigin({25.f, 25.f});
-    square.setPosition({400.f, 100.f});
-
-    b2BodyDef bodyDef = b2DefaultBodyDef();
-    bodyDef.type = b2_dynamicBody;
-    bodyDef.position = {square.getPosition().x / SCALE, square.getPosition().y / SCALE};
-    b2BodyId bodyId = b2CreateBody(world, &bodyDef);
-
-	b2Polygon boxShape = b2MakeBox((square.getSize().x * 0.5f) / SCALE, (square.getSize().y * 0.5f) / SCALE);
-    b2ShapeDef shapeDef = b2DefaultShapeDef();
-    shapeDef.density = 1.f;
-    shapeDef.material.friction = 0.3f;
-	shapeDef.material.restitution = 0.0f;
-    b2CreatePolygonShape(bodyId, &shapeDef, &boxShape);
-
-    registry.emplace<Transform>(entity, square);
-    registry.emplace<RigidBody>(entity, bodyId);
-
-    b2BodyDef groundDef = b2DefaultBodyDef();
-    groundDef.position = {400.f / SCALE, 580.f / SCALE};
-    b2BodyId groundBody = b2CreateBody(world, &groundDef);
-
-    b2Polygon groundBox = b2MakeBox(400.f / SCALE, 10.f / SCALE);
-    b2CreatePolygonShape(groundBody, &shapeDef, &groundBox);
 
 	sf::Clock deltaClock;
 
 	float deltaTime = 0.f;
     float fps = 0.f;
+
+	game.Init();
 
     while(window.isOpen())
 	{
@@ -76,57 +40,52 @@ int main() {
 		while(const auto event = window.pollEvent())
         {
 			ImGui::SFML::ProcessEvent(window, *event);
-            if (event->is<sf::Event::Closed>())
+            if(event->is<sf::Event::Closed>())
                 window.close();
+
+			if (const auto* resized = event->getIf<sf::Event::Resized>())
+			{
+				UpdateAspectRatio(window, view);
+				window.setView(view);
+			}
+
+			game.ProcessInput(deltaTime);
         }
 
-		bool moveLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
-        bool moveRight = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
-        bool jump = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
-
-		auto [xf, rb] = registry.get<Transform, RigidBody>(entity);
-        if (moveLeft) {
-			b2Body_ApplyForceToCenter(rb.body, {-MOVE_FORCE, 0.f}, true);
-		}
-		if (moveRight) {
-			b2Body_ApplyForceToCenter(rb.body, { MOVE_FORCE, 0.f}, true);
-		}
-
-		if (jump) {
-			b2Vec2 vel = b2Body_GetLinearVelocity(rb.body);
-			if (std::abs(vel.y) < 0.01f) {
-				b2Body_ApplyLinearImpulseToCenter(rb.body, {0.f, - JUMP_IMPULSE}, true);
-			}
-		}
+		game.Update(deltaTime, window);
 
 		ImGui::SFML::Update(window, dt);
-        ImGui::Begin("Debug");
-        ImGui::Text("Delta Time: %.4f", deltaTime);
-        ImGui::Text("FPS: %.1f", fps);
-        ImGui::Text("Use A/D to move, Space to jump");
-        ImGui::End();
-
-		b2World_Step(world, 1.f/60.f, 8);
-
-		registry.view<Transform, RigidBody>().each([&](auto &xf, auto &rb){
-            b2Vec2 pos = b2Body_GetPosition(rb.body);
-            b2Rot rot = b2Body_GetRotation(rb.body);
-            xf.shape.setPosition({pos.x * SCALE, pos.y * SCALE});
-            xf.shape.setRotation(sf::degrees(b2Rot_GetAngle(rot)) * 180.f / B2_PI);
-        });
+        game.RenderUI(deltaTime, fps);
 
 		window.clear();
 
-		registry.view<Transform>().each([&](auto& transform) {
-            window.draw(transform.shape);
-        });
-
+		game.Render(window);
 		ImGui::SFML::Render(window);
 
         window.display();
     }
 
-	b2DestroyWorld(world);
 	ImGui::SFML::Shutdown();
     return 0;
+}
+
+void UpdateAspectRatio(sf::RenderWindow& window, sf::View& view) {
+    float windowAspectRatio = static_cast<float>(window.getSize().x) / window.getSize().y;
+    float viewWidth, viewHeight;
+    sf::Vector2f viewSize(WIDTH_SIZE, HEIGHT_SIZE);
+
+    if (windowAspectRatio > TARGET_ASPECT_RATIO) {
+        viewHeight = HEIGHT_SIZE;
+        viewWidth = viewHeight * windowAspectRatio;
+        viewSize.x = viewWidth;
+        view.setViewport(sf::FloatRect({(1.f - TARGET_ASPECT_RATIO / windowAspectRatio) / 2.f, 0.f}, {TARGET_ASPECT_RATIO / windowAspectRatio, 1.f}));
+    } else {
+        viewWidth = WIDTH_SIZE;
+        viewHeight = viewWidth / windowAspectRatio;
+        viewSize.y = viewHeight;
+        view.setViewport(sf::FloatRect({0.f, (1.f - windowAspectRatio / TARGET_ASPECT_RATIO) / 2.f}, {1.f, windowAspectRatio / TARGET_ASPECT_RATIO}));
+    }
+
+    view.setSize(viewSize);
+    view.setCenter({viewSize.x / 2.f, viewSize.y / 2.f});
 }

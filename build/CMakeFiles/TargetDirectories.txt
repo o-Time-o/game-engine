@@ -1,0 +1,3 @@
+/home/soul/Documents/game/build/CMakeFiles/game.dir
+/home/soul/Documents/game/build/CMakeFiles/edit_cache.dir
+/home/soul/Documents/game/build/CMakeFiles/rebuild_cache.dir

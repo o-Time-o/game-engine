@@ -1,6 +1,0 @@
-build/
-CMakeLists.txt
-compile_flags.txt
-rebuild.sh
-.gitignore
-.clang-format

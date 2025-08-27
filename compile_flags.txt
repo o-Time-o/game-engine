@@ -1,0 +1,3 @@
+-I/home/soul/Documents/game/headers
+-I/home/soul/Documents/game/include
+-I/home/soul/Documents/game/src
